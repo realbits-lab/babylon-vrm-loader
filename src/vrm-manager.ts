@@ -8,6 +8,11 @@ import { SpringBoneController } from './secondary-animation/spring-bone-controll
 import { HumanoidBone } from './humanoid-bone';
 import type { IVRM } from './vrm-interfaces';
 import { MaterialValueBindingMerger } from './material-value-binding-merger';
+//*-----------------------------------------------------------------------------
+//* TODO: Patched.
+import { ConstructSpringsOptions } from './secondary-animation/spring-bone-controller';
+import type { Node, TargetCamera } from '@babylonjs/core';
+//*-----------------------------------------------------------------------------
 
 interface IsBinaryMap {
     [morphName: string]: boolean;
@@ -37,6 +42,36 @@ interface TransformNodeCache {
 interface MeshCache {
     [meshIndex: number]: Mesh[];
 }
+
+//*-----------------------------------------------------------------------------
+//* TODO: Patched.
+export class morphingTargetProperty {
+    private _value: number;
+    get value(): number {
+        return this._value;
+    }
+
+    set value(value: number) {
+        this._value = Math.max(0, Math.min(1, value));
+        this.manager.morphing(this.label, value);
+    }
+
+    constructor(public label: string, value: number, private manager: VRMManager) {
+        this._value = value;
+    }
+}
+
+interface MorphTargetPropertyMap {
+    [morphName: string]: morphingTargetProperty;
+}
+
+export interface TransformNodeTreeNode {
+    id: number;
+    name: string;
+    parent: number;
+    children?: TransformNodeTreeNode[];
+}
+//*-----------------------------------------------------------------------------
 
 /**
  * Unity Humanoid Bone 名
@@ -113,6 +148,37 @@ export class VRMManager {
     private _humanoidBone: HumanoidBone;
     private _rootMesh: Mesh;
 
+    //*-------------------------------------------------------------------------
+    //* TODO: Patched.
+    public static ROOT_MESH_PREFIX = 'vrm_root_';
+
+    private _transformNodeTree: TransformNodeTreeNode;
+    get transformNodeTree(): TransformNodeTreeNode {
+        return this._transformNodeTree;
+    }
+
+    /**
+     * This is necessary because of the way BabylonJS animation works
+     */
+    public MorphTargetPropertyMap: MorphTargetPropertyMap = {};
+
+    private _rootSkeleton: Node;
+
+    private _cameras: TargetCamera[] = [];
+
+    get cameras(): TargetCamera[] {
+        return this._cameras;
+    }
+
+    public appendCamera(camera: TargetCamera) {
+        this._cameras.push(camera);
+    }
+
+    public resetCameras() {
+        this._cameras = [];
+    }
+    //*-------------------------------------------------------------------------
+
     /**
      * Secondary Animation として定義されている VRM Spring Bone のコントローラ
      */
@@ -125,13 +191,17 @@ export class VRMManager {
      * @param meshesFrom この番号以降のメッシュがこの VRM に該当する
      * @param transformNodesFrom この番号以降の TransformNode がこの VRM に該当する
      * @param materialsNodesFrom この番号以降の Material がこの VRM に該当する
+     //* TODO: Patched.
+     * @param uri URI this manager belongs to
      */
     public constructor(
         public readonly ext: IVRM,
         public readonly scene: Scene,
         private readonly meshesFrom: number,
         private readonly transformNodesFrom: number,
-        private readonly materialsNodesFrom: number
+        private readonly materialsNodesFrom: number,
+        //* TODO: Patched.
+        public readonly uri: string
     ) {
         this.meshCache = this.constructMeshCache();
         this.transformNodeCache = this.constructTransformNodeCache();
@@ -145,16 +215,83 @@ export class VRMManager {
         this.constructTransformNodeMap();
 
         this._humanoidBone = new HumanoidBone(this.transformNodeMap);
+
+        //*---------------------------------------------------------------------
+        //* TODO: Patched.
+        //* TODO: Handle later.
+        // this.removeDuplicateSkeletons();
+        this._rootSkeleton = this.getRootSkeletonNode();
+        // Rename __root__ node
+        this.rootMesh.name = VRMManager.ROOT_MESH_PREFIX + this.scene.getNodes().filter((e) => e.name.includes(VRMManager.ROOT_MESH_PREFIX)).length;
+        //*---------------------------------------------------------------------
     }
 
+    //*-------------------------------------------------------------------------
+    //* TODO: Patched.
+    /**
+     * Remove duplicate skeletons when importing VRM.
+     * Only tested on VRoidStudio output files.
+     * @private
+     */
+    private removeDuplicateSkeletons() {
+        let skeleton = null;
+        for (const nodeIndex of Object.keys(this.meshCache).map(Number)) {
+            const meshes = this.meshCache[nodeIndex];
+            if (meshes.length && meshes[0].skeleton) {
+                if (!skeleton) {
+                    skeleton = meshes[0].skeleton;
+                    if (this._rootMesh) {
+                        const rootBone = skeleton.bones[0];
+                        // Usually it is called "Root", but there are exceptions
+                        if (rootBone.name !== 'Root') console.warn('The first bone has a different name than "Root"');
+                    }
+                } else {
+                    // weak sanity check
+                    if (skeleton.bones.length != meshes[0].skeleton.bones.length) console.warn('Skeletons have different numbers of bones!');
+
+                    meshes[0].skeleton.dispose();
+                    for (const mesh of meshes) {
+                        mesh.skeleton = skeleton;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Find the root node of skeleton.
+     * @private
+     */
+    private getRootSkeletonNode(): Node {
+        const rootMeshChildren = this._rootMesh.getChildren((node: Node) => {
+            return node.name === 'Root' || node.name === 'Armature';
+        });
+        if (rootMeshChildren.length > 0) return rootMeshChildren[0];
+        else {
+            // Try to find in scene directly
+            const rootMeshChild = this.scene.getNodeByName('Root') ? this.scene.getNodeByName('Root') : this.scene.getNodeByName('Armature');
+            if (rootMeshChild && !rootMeshChild.parent) return rootMeshChild;
+            else throw Error('Cannot find root skeleton node!');
+        }
+    }
+    //*-------------------------------------------------------------------------
+
+    //*-------------------------------------------------------------------------
+    //* TODO: Patched.
     /**
      * Secondary Animation を更新する
      *
      * @param deltaTime 前フレームからの経過秒数(sec)
+     //* TODO: Patched.
+     * @param boneOptions
      */
-    public async update(deltaTime: number): Promise<void> {
-        await this.springBoneController.update(deltaTime);
+    // public async update(deltaTime: number): Promise<void> {
+    //     await this.springBoneController.update(deltaTime);
+    // }
+    public async update(deltaTime: number, boneOptions?: ConstructSpringsOptions): Promise<void> {
+        await this.springBoneController.update(deltaTime, boneOptions);
     }
+    //*-------------------------------------------------------------------------
 
     /**
      * 破棄処理
@@ -163,6 +300,12 @@ export class VRMManager {
         this.springBoneController.dispose();
         this._humanoidBone.dispose();
 
+        //*---------------------------------------------------------------------
+        //* TODO: Patched.
+        this._rootSkeleton.dispose();
+        if (this._rootMesh) this._rootMesh.dispose();
+        //*---------------------------------------------------------------------
+
         (this.morphTargetMap as any) = null;
         (this.materialValueBindingMergerMap as any) = null;
         (this.presetMorphTargetMap as any) = null;
@@ -170,6 +313,13 @@ export class VRMManager {
         (this.transformNodeCache as any) = null;
         (this.meshCache as any) = null;
         (this._rootMesh as any) = null;
+
+        //*---------------------------------------------------------------------
+        //* TODO: Patched.
+        (this.MorphTargetPropertyMap as any) = null;
+        (this._cameras as any) = null;
+        (this._transformNodeTree as any) = null;
+        //*---------------------------------------------------------------------
     }
 
     /**
@@ -249,15 +399,22 @@ export class VRMManager {
         return this.findTransformNode(this.ext.firstPerson.firstPersonBone);
     }
 
+    //*-------------------------------------------------------------------------
+    //* TODO: Patched.
     /**
      * ボーン名からそのボーンに該当する TransformNode を取得する
      *
      * @param name HumanBoneName
      * @deprecated Use humanoidBone getter instead. This method will delete at v2.
      */
-    public getBone(name: HumanBoneName): Nullable<TransformNode> {
-        return this.transformNodeMap[name] || null;
+    // public getBone(name: HumanBoneName): Nullable<TransformNode> {
+    //     return this.transformNodeMap[name] || null;
+    // }
+
+    public get rootSkeletonNode(): Node {
+        return this._rootSkeleton;
     }
+    //*-------------------------------------------------------------------------
 
     /**
      * Get HumanoidBone Methods
@@ -285,14 +442,28 @@ export class VRMManager {
         return this.transformNodeCache[nodeIndex] || null;
     }
 
+    //*-------------------------------------------------------------------------
+    //* TODO: Patched.
     /**
      * mesh 番号からメッシュを探す
      * gltf の mesh 番号は `metadata.gltf.pointers` に記録されている
      * @deprecated Use findMeshes instead. This method has broken.
      */
-    public findMesh(meshIndex: number): Nullable<Mesh> {
-        return (this.meshCache[meshIndex] && this.meshCache[meshIndex][0]) || null;
+    // public findMesh(meshIndex: number): Nullable<Mesh> {
+    //     return (this.meshCache[meshIndex] && this.meshCache[meshIndex][0]) || null;
+    // }
+    /**
+     * Find index of s specific TransformNode from cache
+     * @param node
+     */
+
+    public indexOfTransformNode(node: Nullable<Node>): number {
+        for (const [k, v] of Object.entries(this.transformNodeCache)) {
+            if (node == v) return parseInt(k, 10);
+        }
+        return -1;
     }
+    //*-------------------------------------------------------------------------
 
     /**
      * mesh 番号からメッシュを探す
@@ -337,6 +508,10 @@ export class VRMManager {
                         target,
                         weight: b.weight,
                     });
+                    //*---------------------------------------------------------
+                    //* TODO: Patched.
+                    this.MorphTargetPropertyMap[g.name] = new morphingTargetProperty(g.name, 0, this);
+                    //*---------------------------------------------------------
                     if (g.presetName) {
                         this.presetMorphTargetMap[g.presetName] = this.presetMorphTargetMap[g.presetName] || [];
                         this.presetMorphTargetMap[g.presetName].push({
@@ -366,14 +541,50 @@ export class VRMManager {
      * 事前に TransformNode と bone 名を紐づける
      */
     private constructTransformNodeMap() {
+        //*---------------------------------------------------------------------
+        //* TODO: Patched.
+        const treePreArr: TransformNodeTreeNode[] = [];
+        //*---------------------------------------------------------------------
         this.ext.humanoid.humanBones.forEach((b) => {
             const node = this.findTransformNode(b.node);
             if (!node) {
                 return;
             }
             this.transformNodeMap[b.bone] = node;
+            //*-----------------------------------------------------------------
+            //* TODO: Patched.
+            treePreArr.push({ id: b.node, name: b.bone, parent: this.indexOfTransformNode(node.parent) });
+            //*-----------------------------------------------------------------
         });
+
+        //*---------------------------------------------------------------------
+        //* TODO: Patched.
+        const tree = this.hierarchy(treePreArr);
+        if (tree.length === 0) throw Error('Failed to construct bone hierarchy tree!');
+        this._transformNodeTree = tree[0];
+        //*---------------------------------------------------------------------
     }
+
+    //*-------------------------------------------------------------------------
+    //* TODO: Patched.
+    private hierarchy(data: TransformNodeTreeNode[]) {
+        const tree: TransformNodeTreeNode[] = [];
+        const childOf: any = {};
+        data.forEach((item) => {
+            const id = item.id;
+            const parent = item.parent;
+            childOf[id] = childOf[id] || [];
+            item.children = childOf[id];
+            // Assume Hips is root
+            if (parent != null && this.transformNodeCache[parent].parent != this._rootMesh && item.name.toLowerCase() !== 'hips') {
+                (childOf[parent] = childOf[parent] || []).push(item);
+            } else {
+                tree.push(item);
+            }
+        });
+        return tree;
+    }
+    //*-------------------------------------------------------------------------
 
     /**
      * node 番号と TransformNode を紐づける
@@ -388,7 +599,11 @@ export class VRMManager {
             }
             for (const pointer of node.metadata.gltf.pointers) {
                 if (pointer.startsWith('/nodes/')) {
-                    const nodeIndex = parseInt((pointer as string).substr(7), 10);
+                    //*---------------------------------------------------------
+                    //* TODO: Patched.
+                    // const nodeIndex = parseInt((pointer as string).substr(7), 10);
+                    const nodeIndex = parseInt((pointer as string).substring(7), 10);
+                    //*---------------------------------------------------------
                     cache[nodeIndex] = node;
                     break;
                 }
@@ -424,4 +639,20 @@ export class VRMManager {
         }
         return cache;
     }
+
+    //*-------------------------------------------------------------------------
+    //* TODO: Patched.
+    /**
+     * Set whether shadow are received.
+     * @param enabled
+     */
+    public setShadowEnabled(enabled: boolean) {
+        for (const nodeIndex of Object.keys(this.meshCache).map(Number)) {
+            const meshes = this.meshCache[nodeIndex];
+            for (const mesh of meshes) {
+                mesh.receiveShadows = enabled;
+            }
+        }
+    }
+    //*-------------------------------------------------------------------------
 }

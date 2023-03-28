@@ -10,6 +10,33 @@ import { VRMSpringBone } from './vrm-spring-bone';
  */
 type getBone = (nodeIndex: number) => Nullable<TransformNode>;
 
+//* TODO: Patched.
+/**
+ * Options for creating springs
+ */
+export interface ConstructSpringsOptions {
+    /**
+     * The resilience of the swaying object
+     */
+    stiffness?: number;
+    /**
+     * The strength of gravity
+     */
+    gravityPower?: number;
+    /**
+     * The direction of gravity. Set (0, -1, 0) for simulating the gravity. Set (1, 0, 0) for simulating the wind.
+     */
+    gravityDir?: Vector3;
+    /**
+     * The resistance (deceleration) of automatic animation
+     */
+    dragForce?: number;
+    /**
+     * The radius of the sphere used for the collision detection with colliders
+     */
+    hitRadius?: number;
+}
+
 /**
  * VRM SpringBone Controller
  */
@@ -23,9 +50,12 @@ export class SpringBoneController {
      * @param ext SecondaryAnimation Object
      * @param getBone
      */
-    public constructor(public readonly ext: IVRMSecondaryAnimation, getBone: getBone) {
+    //* TODO: Patched.
+    public constructor(public readonly ext: IVRMSecondaryAnimation, getBone: getBone, options?: ConstructSpringsOptions) {
         const colliderGroups = this.constructColliderGroups(getBone);
-        this.springs = this.constructSprings(getBone, colliderGroups);
+        //* TODO: Patched.
+        // this.springs = this.constructSprings(getBone, colliderGroups);
+        this.springs = this.constructSprings(getBone, colliderGroups, options);
     }
 
     public dispose() {
@@ -38,11 +68,17 @@ export class SpringBoneController {
      * @param deltaTime Elapsed sec from previous frame
      * @see https://docs.unity3d.com/ScriptReference/Time-deltaTime.html
      */
-    public async update(deltaTime: number): Promise<void> {
+    //* TODO: Patched.
+    // public async update(deltaTime: number): Promise<void> {
+    public async update(deltaTime: number, boneOptions?: ConstructSpringsOptions): Promise<void> {
         // ポーズ後のあらぶり防止のため clamp
         deltaTime = Math.max(0.0, Math.min(16.666, deltaTime)) / 1000;
         const promises = this.springs.map<Promise<void>>((spring) => {
-            return spring.update(deltaTime);
+            //*-----------------------------------------------------------------
+            //* TODO: Patched.
+            // return spring.update(deltaTime);
+            return spring.update(deltaTime, boneOptions);
+            //*-----------------------------------------------------------------
         });
         return Promise.all(promises).then(() => {
             /* Do nothing */
@@ -69,7 +105,7 @@ export class SpringBoneController {
         return colliderGroups;
     }
 
-    private constructSprings(getBone: getBone, colliderGroups: ColliderGroup[]) {
+    private constructSprings(getBone: getBone, colliderGroups: ColliderGroup[], options?: ConstructSpringsOptions) {
         if (!this.ext.boneGroups || !this.ext.boneGroups.length) {
             return [];
         }
@@ -82,19 +118,38 @@ export class SpringBoneController {
                 return colliderGroups[g];
             });
             springs.push(
+                //* TODO: Patched.
+                // new VRMSpringBone(
+                //     spring.comment,
+                //     spring.stiffiness,
+                //     spring.gravityPower,
+                //     new Vector3(
+                //         // VRM 右手系Y_UP, -Z_Front から Babylon.js 左手系Y_UP, +Z_Front にする
+                //         -spring.gravityDir.x,
+                //         spring.gravityDir.y,
+                //         -spring.gravityDir.z
+                //     ).normalize(),
+                //     spring.dragForce,
+                //     getBone(spring.center),
+                //     spring.hitRadius,
+                //     rootBones,
+                //     springColliders
+                // )
                 new VRMSpringBone(
                     spring.comment,
-                    spring.stiffiness,
-                    spring.gravityPower,
-                    new Vector3(
-                        // VRM 右手系Y_UP, -Z_Front から Babylon.js 左手系Y_UP, +Z_Front にする
-                        -spring.gravityDir.x,
-                        spring.gravityDir.y,
-                        -spring.gravityDir.z
-                    ).normalize(),
-                    spring.dragForce,
+                    options?.stiffness ? options.stiffness : spring.stiffiness,
+                    options?.gravityPower ? options.gravityPower : spring.gravityPower,
+                    options?.gravityDir
+                        ? options.gravityDir
+                        : new Vector3(
+                              // VRM 右手系Y_UP, -Z_Front から Babylon.js 左手系Y_UP, +Z_Front にする
+                              -spring.gravityDir.x,
+                              spring.gravityDir.y,
+                              -spring.gravityDir.z
+                          ).normalize(),
+                    options?.dragForce ? options.dragForce : spring.dragForce,
                     getBone(spring.center),
-                    spring.hitRadius,
+                    options?.hitRadius ? options.hitRadius : spring.hitRadius,
                     rootBones,
                     springColliders
                 )

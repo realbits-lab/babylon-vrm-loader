@@ -5,6 +5,10 @@ import type { TransformNode } from '@babylonjs/core/Meshes/transformNode';
 import type { Nullable } from '@babylonjs/core/types';
 import type { ColliderGroup } from './collider-group';
 import { VRMSpringBoneLogic } from './vrm-spring-bone-logic';
+//*-----------------------------------------------------------------------------
+//* TODO: Patched.
+import type { ConstructSpringsOptions } from './spring-bone-controller';
+//*-----------------------------------------------------------------------------
 
 /**
  * @see https://github.com/vrm-c/UniVRM/blob/master/Assets/VRM/UniVRM/Scripts/SpringBone/VRMSpringBone.cs
@@ -32,12 +36,27 @@ export class VRMSpringBone {
      */
     public constructor(
         public readonly comment: string,
-        public readonly stiffness: number,
-        public readonly gravityPower: number,
-        public readonly gravityDir: Vector3,
-        public readonly dragForce: number,
+
+        //*---------------------------------------------------------------------
+        //* TODO: Patched.
+        // public readonly stiffness: number,
+        // public readonly gravityPower: number,
+        // public readonly gravityDir: Vector3,
+        // public readonly dragForce: number,
+        public stiffness: number,
+        public gravityPower: number,
+        public gravityDir: Vector3,
+        public dragForce: number,
+        //*---------------------------------------------------------------------
+
         public readonly center: Nullable<TransformNode>,
-        public readonly hitRadius: number,
+
+        //*---------------------------------------------------------------------
+        //* TODO: Patched.
+        // public readonly hitRadius: number,
+        public hitRadius: number,
+        //*---------------------------------------------------------------------
+
         public readonly bones: Array<Nullable<TransformNode>>,
         public readonly colliderGroups: ColliderGroup[]
     ) {
@@ -47,6 +66,11 @@ export class VRMSpringBone {
                 this.verlets.push(new VRMSpringBoneLogic(this.center, this.hitRadius, b));
             });
         });
+
+        //*---------------------------------------------------------------------
+        //* TODO: Patched.
+        this.gravityDir.normalize();
+        //*---------------------------------------------------------------------
 
         if (this.drawGizmo) {
             this.setupGizmo();
@@ -95,7 +119,14 @@ export class VRMSpringBone {
      *
      * @param deltaTime
      */
-    public async update(deltaTime: number): Promise<void> {
+    //* TODO: Patched.
+    // public async update(deltaTime: number): Promise<void> {
+    public async update(deltaTime: number, boneOptions?: ConstructSpringsOptions): Promise<void> {
+        //*---------------------------------------------------------------------
+        //* TODO: Patched.
+        const oldOptions = this.updateOptions(boneOptions);
+        //*---------------------------------------------------------------------
+
         const stiffness = this.stiffness * deltaTime;
         const external = this.gravityDir.scale(this.gravityPower * deltaTime);
 
@@ -106,8 +137,34 @@ export class VRMSpringBone {
             });
         });
 
+        //*---------------------------------------------------------------------
+        //* TODO: Patched.
+        // Restore options
+        this.updateOptions(oldOptions);
+        //*---------------------------------------------------------------------
+
         return Promise.all(promises).then(() => {
             /* Do Nothing */
         });
     }
+
+    //*-------------------------------------------------------------------------
+    //* TODO: Patched.
+    private updateOptions(boneOptions?: ConstructSpringsOptions) {
+        const backupOptions: ConstructSpringsOptions = {
+            stiffness: this.stiffness,
+            gravityPower: this.gravityPower,
+            gravityDir: this.gravityDir.clone(),
+            dragForce: this.dragForce,
+            hitRadius: this.hitRadius,
+        };
+        this.stiffness = boneOptions?.stiffness || this.stiffness;
+        this.gravityPower = boneOptions?.gravityPower || this.gravityPower;
+        this.gravityDir = boneOptions?.gravityDir || this.gravityDir;
+        this.dragForce = boneOptions?.dragForce || this.dragForce;
+        this.hitRadius = boneOptions?.hitRadius || this.hitRadius;
+
+        return backupOptions;
+    }
+    //*-------------------------------------------------------------------------
 }

@@ -11,7 +11,11 @@ interface TransformNodeMap {
  * @see https://docs.unity3d.com/ja/2018.3/ScriptReference/HumanBodyBones.html
  */
 export class HumanoidBone {
-    public constructor(private nodeMap: TransformNodeMap) {}
+    //*-------------------------------------------------------------
+    //* TODO: Patched.
+    // public constructor(private nodeMap: TransformNodeMap) {}
+    public constructor(public nodeMap: TransformNodeMap) {}
+    //*-------------------------------------------------------------
 
     public dispose() {
         (this.nodeMap as any) = null;
