@@ -70,7 +70,7 @@ export class VRMLoaderExtension implements IGLTFLoaderExtension {
         //* TODO: Patched.
         private v3DCore: V3DCore
     ) {
-        console.log('call constructor()');
+        // console.log('call constructor()');
 
         // GLTFLoader has already added rootMesh as __root__ before load extension
         // @see glTFLoader._loadData
@@ -82,8 +82,8 @@ export class VRMLoaderExtension implements IGLTFLoaderExtension {
         //* TODO: Patched.
         this.addLoaderObserver(this.v3DCore);
         this.onLoadedCallBack = () => {
-            console.log('call this.onLoadedCallBack()');
-            console.log('this.manager: ', this.manager);
+            // console.log('call this.onLoadedCallBack()');
+            // console.log('this.manager: ', this.manager);
 
             v3DCore.addVRMManager(this.manager);
         };
@@ -108,11 +108,11 @@ export class VRMLoaderExtension implements IGLTFLoaderExtension {
      * @inheritdoc
      */
     public onReady() {
-        console.log('call onReady()');
-        console.log('this.loader: ', this.loader);
+        // console.log('call onReady()');
+        // console.log('this.loader: ', this.loader);
 
         if (!this.loader.gltf.extensions || !this.loader.gltf.extensions[NAME]) {
-            console.log('call return');
+            // console.log('call return');
             return;
         }
 
@@ -146,9 +146,9 @@ export class VRMLoaderExtension implements IGLTFLoaderExtension {
 
         //*---------------------------------------------------------------------
         //* TODO: Patched.
-        console.log('try to call observer.onLoadReady()');
+        // console.log('try to call observer.onLoadReady()');
         for (const observer of this.loaderObservers) {
-            console.log('observer: ', observer);
+            // console.log('observer: ', observer);
             observer.onLoadReady();
         }
         //*---------------------------------------------------------------------
