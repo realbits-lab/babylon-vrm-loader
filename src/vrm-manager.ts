@@ -392,6 +392,17 @@ export class VRMManager {
         return new Vector3(basePos.x + offsetPos.x, basePos.y + offsetPos.y, basePos.z + offsetPos.z);
     }
 
+    public getHeadBoneCameraPosition(): Nullable<Vector3> {
+        const firstPersonBone = this.getBone("head");
+        if (!firstPersonBone) {
+            return null;
+        }
+
+        const basePos = firstPersonBone.getAbsolutePosition();
+        const offsetPos = this.ext.firstPerson.firstPersonBoneOffset;
+        return new Vector3(basePos.x + offsetPos.x, basePos.y + offsetPos.y, basePos.z + offsetPos.z);
+    }
+
     /**
      * 一人称時に頭とみなす TransformNode を取得する
      */
@@ -407,9 +418,9 @@ export class VRMManager {
      * @param name HumanBoneName
      * @deprecated Use humanoidBone getter instead. This method will delete at v2.
      */
-    // public getBone(name: HumanBoneName): Nullable<TransformNode> {
-    //     return this.transformNodeMap[name] || null;
-    // }
+    public getBone(name: HumanBoneName): Nullable<TransformNode> {
+        return this.transformNodeMap[name] || null;
+    }
 
     public get rootSkeletonNode(): Node {
         return this._rootSkeleton;
