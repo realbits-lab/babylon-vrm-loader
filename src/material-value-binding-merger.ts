@@ -4,8 +4,8 @@ import type { Material, BaseTexture, Texture, Nullable } from '@babylonjs/core';
 import { PBRMaterial } from '@babylonjs/core';
 import type { IVRMBlendShapeMaterialBind } from './vrm-interfaces';
 //* TODO: Handle later.
-// import { MToonMaterial } from 'babylon-mtoon-material';
-import { MToonMaterial } from '../../../shader/babylon-mtoon-material/src';
+import { MToonMaterial } from 'babylon-mtoon-material';
+// import { MToonMaterial } from '../../../shader/babylon-mtoon-material/src';
 
 type SupportedMaterial = MToonMaterial | PBRMaterial;
 
